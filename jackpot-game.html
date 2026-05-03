@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>JACKPOT MACHINE</title>
+
+<style>
+body {
+  margin: 0;
+  background: radial-gradient(circle at top, #111, #000);
+  color: white;
+  font-family: Arial;
+  text-align: center;
+}
+
+/* HEADER */
+h1 {
+  margin-top: 20px;
+  color: gold;
+  letter-spacing: 3px;
+}
+
+/* UI PANEL */
+.panel {
+  width: 420px;
+  margin: 10px auto;
+  padding: 12px;
+  background: #050505;
+  border-radius: 12px;
+  border: 1px solid rgba(255,215,0,0.2);
+}
+
+.credits {
+  font-size: 22px;
+  color: gold;
+}
+
+.status {
+  font-size: 13px;
+  color: #aaa;
+}
+
+/* MACHINE */
+.machine {
+  width: 420px;
+  margin: 20px auto;
+  padding: 25px;
+  background: linear-gradient(145deg, #1a1a1a, #0a0a0a);
+  border-radius: 30px;
+  border: 1px solid rgba(255,215,0,0.2);
+  transition: 0.2s;
+}
+
+/* SHAKE */
+.shake {
+  animation: shake 0.4s;
+}
+@keyframes shake {
+  0% { transform: translate(0,0); }
+  25% { transform: translate(-3px,2px); }
+  50% { transform: translate(3px,-2px); }
+  75% { transform: translate(-2px,1px); }
+  100% { transform: translate(0,0); }
+}
+
+/* REELS */
+.reels {
+  display: flex;
+  justify-content: space-between;
+  margin: 20px 0;
+  padding: 15px;
+  background: #000;
+  border-radius: 18px;
+}
+
+.reel {
+  width: 110px;
+  height: 110px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 48px;
+  background: #0b0b0b;
+  border-radius: 14px;
+  border: 2px solid rgba(255,215,0,0.25);
+}
+
+/* BUTTON */
+button {
+  padding: 12px 28px;
+  border: none;
+  border-radius: 12px;
+  font-weight: bold;
+  background: linear-gradient(90deg, gold, orange);
+  cursor: pointer;
+}
+
+button:disabled {
+  background: #444;
+}
+
+/* RESULT */
+.result {
+  margin-top: 10px;
+  font-size: 14px;
+  color: #ccc;
+}
+</style>
+</head>
+
+<body>
+
+<h1>JACKPOT MACHINE</h1>
+
+<div class="panel">
+  <div class="credits">Credits: <span id="credits">20</span></div>
+  <div class="status" id="status">Ready</div>
+</div>
+
+<div class="machine" id="machine">
+
+  <div class="reels">
+    <div class="reel" id="r1">❔</div>
+    <div class="reel" id="r2">❔</div>
+    <div class="reel" id="r3">❔</div>
+  </div>
+
+  <button id="spinBtn" onclick="spin()">SPIN</button>
+
+  <div class="result" id="result">Press spin</div>
+
+</div>
+
+<!-- 🔊 AUDIO -->
+<audio id="click" src="click.mp3"></audio>
+<audio id="roll" src="roll.mp3"></audio>
+<audio id="tick" src="tick.mp3"></audio>
+
+<audio id="lose" src="lose.mp3"></audio>
+<audio id="double" src="double.mp3"></audio>
+<audio id="triple" src="triple.mp3"></audio>
+<audio id="jackpot" src="jackpot.mp3"></audio>
+
+<script>
+let credits = 20;
+let spinning = false;
+let lossStreak = 0;
+
+const symbols = ["🍒","🍋","🍊","🍇","🔔","⭐","🍀","👑","💎","7️⃣"];
+
+/* 🔊 SOUND */
+function play(id){
+  const a = document.getElementById(id);
+  if(!a) return;
+  a.pause();
+  a.currentTime = 0;
+  a.play().catch(()=>{});
+}
+
+/* 🎰 weighted randomness */
+function rand(){
+  const pool = [
+    ...Array(10).fill("🍒"),
+    ...Array(10).fill("🍋"),
+    ...Array(8).fill("🍊"),
+    ...Array(8).fill("🍇"),
+    ...Array(6).fill("🔔"),
+    ...Array(4).fill("⭐"),
+    ...Array(3).fill("🍀"),
+    ...Array(2).fill("👑"),
+    "💎","7️⃣"
+  ];
+  return pool[Math.floor(Math.random()*pool.length)];
+}
+
+/* 🎥 reel animation */
+function spinReel(el, time, final){
+  return new Promise(res=>{
+    let i=setInterval(()=>el.innerText=symbols[Math.floor(Math.random()*symbols.length)],50);
+
+    setTimeout(()=>{
+      clearInterval(i);
+      el.innerText=final;
+      play("tick");
+      res();
+    },time);
+  });
+}
+
+/* 🎰 MAIN SPIN */
+async function spin(){
+  if(spinning || credits <= 0) return;
+
+  spinning = true;
+  document.getElementById("spinBtn").disabled = true;
+
+  document.getElementById("status").innerText = "Click...";
+  play("click");
+
+  await new Promise(r=>setTimeout(r,1000));
+
+  document.getElementById("status").innerText = "Spinning...";
+  play("roll");
+
+  credits -= 1;
+  updateCredits();
+
+  const a = rand();
+  const b = rand();
+  const c = rand();
+
+  await spinReel(r1,700,a);
+  await spinReel(r2,1100,b);
+  await spinReel(r3,1500,c);
+
+  evaluate(a,b,c);
+
+  spinning = false;
+  document.getElementById("spinBtn").disabled = false;
+}
+
+/* 🎯 LOGIC */
+function evaluate(a,b,c){
+  let msg = `${a} | ${b} | ${c}`;
+  let sound = "lose";
+
+  const m = document.getElementById("machine");
+
+  if(a==="7️⃣"&&b==="7️⃣"&&c==="7️⃣"){
+    credits += 25;
+    msg += " JACKPOT!";
+    sound = "jackpot";
+    lossStreak = 0;
+
+    m.classList.add("shake");
+    setTimeout(()=>m.classList.remove("shake"),400);
+  }
+  else if(a===b&&b===c){
+    credits += 10;
+    msg += " TRIPLE!";
+    sound = "triple";
+    lossStreak = 0;
+  }
+  else if(a===b||b===c||a===c){
+    credits += 5;
+    msg += " DOUBLE!";
+    sound = "double";
+    lossStreak = 0;
+  }
+  else {
+    lossStreak++;
+    msg += " LOSS";
+  }
+
+  play(sound);
+  document.getElementById("result").innerText = msg;
+
+  updateCredits();
+}
+
+/* 💰 UI update */
+function updateCredits(){
+  document.getElementById("credits").innerText = credits;
+}
+</script>
+
+</body>
+</html>
